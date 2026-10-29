@@ -330,14 +330,22 @@ export default function DashboardPage({ result, onReset }: Props) {
         </div>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-slate-500 font-mono">{pred.session_id.slice(0, 8)}</span>
-          <span className="text-xs bg-white/5 border border-white/10 px-2.5 py-1 rounded-full text-slate-400">
-            v{pred.model_version}
+          {pred.analysis_mode === 'demo' && (
+            <span className="text-xs bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-full text-purple-300 font-semibold">
+              Demo · synthetic data
+            </span>
+          )}
+          <span className="text-xs bg-white/5 border border-white/10 px-2.5 py-1 rounded-full text-slate-400"
+            title={pred.scoring_method === 'ml' ? `ML models trained on ${pred.training_data} data` : 'No trained models loaded — scored with biomechanical rules'}>
+            {pred.scoring_method === 'ml'
+              ? `ML v${pred.model_version}${pred.training_data !== 'real' ? ` · ${pred.training_data}-trained` : ''}`
+              : 'Rule-based scoring'}
           </span>
           <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
             pred.confidence >= 0.8 ? 'bg-green-500/10 text-green-400 border border-green-500/20'
             : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
           }`}>
-            {Math.round(pred.confidence * 100)}% confidence
+            {Math.round(pred.confidence * 100)}% signal quality
           </span>
         </div>
       </header>

@@ -93,45 +93,57 @@ class InferenceEngine:
         self._form_model = None
         self._success_model = None
         self._scaler = None
+        self._training_data: Optional[str] = None
         self._feature_eng = FeatureEngineer()
         self._model_version = settings.MODEL_VERSION
         self._load_models()
 
     def _load_models(self):
-        form_path    = os.path.join(settings.MODEL_DIR, "form_model.pkl")
-        success_path = os.path.join(settings.MODEL_DIR, "success_model.pkl")
-        scaler_path  = os.path.join(settings.MODEL_DIR, "scaler.pkl")
-        if os.path.exists(form_path):
-            with open(form_path, "rb") as f:
-                self._form_model = pickle.load(f)
-            logger.info("Form model loaded from %s", form_path)
-        if os.path.exists(success_path):
-            with open(success_path, "rb") as f:
-                self._success_model = pickle.load(f)
-            logger.info("Success model loaded from %s", success_path)
-        if os.path.exists(scaler_path):
-            with open(scaler_path, "rb") as f:
-                self._scaler = pickle.load(f)
+        """Load form model, success model and scaler together — all three or none."""
+        paths = {name: os.path.join(settings.MODEL_DIR, f"{name}.pkl")
+                 for name in ("form_model", "success_model", "scaler")}
+        missing = [name for name, p in paths.items() if not os.path.exists(p)]
+        if missing:
+            logger.warning("Model artifacts missing (%s) — using rule-based scoring", ", ".join(missing))
+            return
 
-    def predict(self, features: BiomechanicalFeatures) -> Tuple[float, float, float]:
+        loaded = {}
+        for name, p in paths.items():
+            with open(p, "rb") as f:
+                loaded[name] = pickle.load(f)
+        self._form_model    = loaded["form_model"]
+        self._success_model = loaded["success_model"]
+        self._scaler        = loaded["scaler"]
+
+        from app.ml.model_registry import get_active_entry
+        entry = get_active_entry()
+        self._training_data = entry.get("data_source", "unknown") if entry else "unknown"
+        logger.info("ML models loaded from %s (training data: %s)", settings.MODEL_DIR, self._training_data)
+
+    @property
+    def models_loaded(self) -> bool:
+        return self._form_model is not None and self._success_model is not None
+
+    @property
+    def training_data(self) -> Optional[str]:
+        """Provenance of the loaded models' training data, or None when rule-based."""
+        return self._training_data if self.models_loaded else None
+
+    def predict(self, features: BiomechanicalFeatures) -> Tuple[float, float, str]:
         """
-        Returns (form_score 0-100, make_probability 0-1, confidence 0-1).
+        Returns (form_score 0-100, make_probability 0-1, scoring_method "ml" | "rule_based").
         """
-        x = self._feature_eng.to_array(features).reshape(1, -1)
-
-        if self._scaler:
-            x = self._scaler.transform(x)
-
-        if self._form_model and self._success_model:
+        if self.models_loaded:
+            x = self._scaler.transform(self._feature_eng.to_array(features).reshape(1, -1))
             form_score    = float(np.clip(self._form_model.predict(x)[0], 0, 100))
             make_prob_raw = self._success_model.predict_proba(x)[0]
             make_prob     = float(make_prob_raw[1]) if len(make_prob_raw) > 1 else float(make_prob_raw[0])
-            confidence    = 0.88
+            method        = "ml"
         else:
             form_score, make_prob = self._rule_based_score(features)
-            confidence = 0.72  # lower confidence for heuristic scoring
+            method = "rule_based"
 
-        return round(form_score, 1), round(make_prob, 3), round(confidence, 3)
+        return round(form_score, 1), round(make_prob, 3), method
 
     def _rule_based_score(self, f: BiomechanicalFeatures) -> Tuple[float, float]:
         """

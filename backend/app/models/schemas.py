@@ -130,7 +130,12 @@ class ShotPrediction(BaseModel):
     form_score: float = Field(ge=0, le=100, description="Biomechanical form score 0-100")
     form_grade: FormGrade
     make_probability: float = Field(ge=0, le=1, description="Shot success probability 0-1")
-    confidence: float = Field(ge=0, le=1, description="Model confidence in prediction")
+    confidence: float = Field(ge=0, le=1, description="Signal quality of the CV inputs (pose/ball/hoop coverage)")
+
+    # Provenance — so the UI never presents synthetic or heuristic output as real ML
+    analysis_mode: str = Field(default="video", description='"video" (real upload) or "demo" (synthetic data)')
+    scoring_method: str = Field(default="rule_based", description='"ml" or "rule_based"')
+    training_data: Optional[str] = Field(default=None, description='ML training data source: "real" | "synthetic" | "unknown"')
 
     # Detailed features
     features: BiomechanicalFeatures

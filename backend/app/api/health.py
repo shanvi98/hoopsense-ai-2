@@ -1,6 +1,7 @@
 """HoopSense AI — Health Check Routes"""
 from fastapi import APIRouter
 from datetime import datetime
+from app.api.analysis import _service
 
 router = APIRouter()
 
@@ -10,4 +11,5 @@ async def health():
 
 @router.get("/health/ready", summary="Readiness probe")
 async def ready():
-    return {"ready": True, "models_loaded": True}
+    caps = _service.capabilities()
+    return {"ready": caps["video_analysis"], **caps}

@@ -33,9 +33,15 @@ export default function UploadPage({ onResult }: Props) {
         if (step < steps.length) { setProgress(steps[step++]) }
       }, 3500)
       const stop = pollUntilDone(upload.session_id, (r) => {
-        if (r.status === 'completed' || r.status === 'failed') {
+        if (r.status === 'completed') {
           clearInterval(stepTimer); stop(); onResult(r)
+        } else if (r.status === 'failed') {
+          clearInterval(stepTimer); stop()
+          setError(r.error || 'Analysis failed'); setStatus('error')
         }
+      }, (e) => {
+        clearInterval(stepTimer)
+        setError(e.message); setStatus('error')
       })
     } catch (e: any) {
       setError(e.message || 'Analysis failed'); setStatus('error')

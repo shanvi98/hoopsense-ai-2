@@ -30,6 +30,11 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
     if ext not in settings.SUPPORTED_FORMATS:
         raise HTTPException(400, f"Unsupported format '{ext}'. Use: {settings.SUPPORTED_FORMATS}")
 
+    missing = _service.missing_cv_components()
+    if missing:
+        raise HTTPException(503, f"Video analysis unavailable on this server — missing: {', '.join(missing)}. "
+                                 "Install the CV dependencies or use demo mode.")
+
     # Create session
     session_id = _service.create_session()
 

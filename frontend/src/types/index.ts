@@ -30,6 +30,8 @@ export interface PoseFrame {
 export interface ShotPrediction {
   session_id: string; status: AnalysisStatus; form_score: number; form_grade: FormGrade
   make_probability: number; confidence: number; features: BiomechanicalFeatures
+  analysis_mode: 'video' | 'demo'; scoring_method: 'ml' | 'rule_based'
+  training_data: 'real' | 'synthetic' | 'unknown' | null
   feedback: FeedbackItem[]; ball_trajectory: TrajectoryPoint[]; pose_frames: PoseFrame[]
   hoop_position: HoopPosition | null; video_fps: number; video_duration_s: number
   total_frames: number; shot_phase_frames: Record<string, number>; model_version: string

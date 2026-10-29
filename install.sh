@@ -11,8 +11,17 @@ echo ""
 # Activate venv if not already active
 if [[ -z "$VIRTUAL_ENV" ]]; then
     if [[ ! -d ".venv" ]]; then
-        python3 -m venv .venv
-        echo "✅ Created .venv"
+        # MediaPipe ships wheels for Python 3.9–3.12 only; 3.11 matches the Docker image
+        PYTHON=""
+        for candidate in python3.11 python3.12 python3.10; do
+            if command -v $candidate &>/dev/null; then PYTHON=$candidate; break; fi
+        done
+        if [[ -z "$PYTHON" ]]; then
+            echo "❌ Python 3.10–3.12 not found (MediaPipe does not support 3.13+). Run: brew install python@3.11"
+            exit 1
+        fi
+        $PYTHON -m venv .venv
+        echo "✅ Created .venv with $($PYTHON --version)"
     fi
     source .venv/bin/activate
     echo "✅ Activated .venv"

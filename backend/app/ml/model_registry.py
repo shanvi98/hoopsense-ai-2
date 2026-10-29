@@ -29,6 +29,7 @@ def register_model(
     success_accuracy: float,
     success_auc: float,
     n_train_samples: int,
+    data_source: str = "unknown",   # "synthetic" | "real" | "unknown"
     notes: str = "",
 ) -> None:
     os.makedirs(settings.MODEL_DIR, exist_ok=True)
@@ -43,11 +44,12 @@ def register_model(
             "success_auc": round(success_auc, 3),
         },
         "n_train_samples": n_train_samples,
+        "data_source": data_source,
         "notes": notes,
         "artifacts": {
-            "form_model":    f"form_model_{version}.pkl",
-            "success_model": f"success_model_{version}.pkl",
-            "scaler":        f"scaler_{version}.pkl",
+            "form_model":    "form_model.pkl",
+            "success_model": "success_model.pkl",
+            "scaler":        "scaler.pkl",
         },
     }
     registry["models"].append(entry)
@@ -60,6 +62,12 @@ def register_model(
 def get_active_version() -> Optional[str]:
     registry = load_registry()
     return registry.get("active_version")
+
+
+def get_active_entry() -> Optional[Dict[str, Any]]:
+    registry = load_registry()
+    active = registry.get("active_version")
+    return next((m for m in reversed(registry.get("models", [])) if m["version"] == active), None)
 
 
 def list_versions() -> list:

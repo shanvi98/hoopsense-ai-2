@@ -25,6 +25,7 @@ export async function runDemo(): Promise<AnalysisResult> {
 export function pollUntilDone(
   sessionId: string,
   onUpdate: (r: AnalysisResult) => void,
+  onError: (e: Error) => void,
   intervalMs = 2000
 ): () => void {
   const timer = setInterval(async () => {
@@ -32,7 +33,10 @@ export function pollUntilDone(
       const result = await pollStatus(sessionId)
       onUpdate(result)
       if (result.status === 'completed' || result.status === 'failed') clearInterval(timer)
-    } catch (_) { clearInterval(timer) }
+    } catch (e) {
+      clearInterval(timer)
+      onError(e instanceof Error ? e : new Error('Status check failed'))
+    }
   }, intervalMs)
   return () => clearInterval(timer)
 }

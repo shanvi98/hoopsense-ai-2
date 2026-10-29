@@ -6,16 +6,17 @@ echo "🏀 HoopSense AI Setup"
 echo "====================="
 
 # ── Check Python ──────────────────────────────────────────────────────────────
-if command -v python3 &>/dev/null; then
-    PYTHON=python3
-    echo "✅ Python: $(python3 --version)"
-elif command -v python &>/dev/null; then
-    PYTHON=python
-    echo "✅ Python: $(python --version)"
-else
-    echo "❌ Python not found. Install from https://www.python.org/downloads/"
+# MediaPipe ships wheels for Python 3.9–3.12 only; 3.11 matches the Docker image
+PYTHON=""
+for candidate in python3.11 python3.12 python3.10; do
+    if command -v $candidate &>/dev/null; then PYTHON=$candidate; break; fi
+done
+if [[ -z "$PYTHON" ]]; then
+    echo "❌ Python 3.10–3.12 not found (MediaPipe does not support 3.13+)."
+    echo "   Install with: brew install python@3.11"
     exit 1
 fi
+echo "✅ Python: $($PYTHON --version)"
 
 # ── Check Node ────────────────────────────────────────────────────────────────
 if command -v node &>/dev/null; then

@@ -33,6 +33,10 @@ from sklearn.metrics import (
     mean_absolute_error, r2_score
 )
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.core.config import settings
+from app.ml.model_registry import register_model
+
 FEATURE_COLS = [
     "elbow_angle_release","elbow_angle_min","knee_bend_max","wrist_release_angle",
     "hip_shoulder_alignment","trunk_lean_angle","shooting_arm_extension",
@@ -99,7 +103,7 @@ def generate_synthetic_dataset(n=2000, seed=42):
     return df
 
 
-def train(data_path: str, output_dir: str, use_synthetic: bool = False):
+def train(data_path: str, output_dir: str, use_synthetic: bool = False, data_source: str = "unknown"):
     os.makedirs(output_dir, exist_ok=True)
 
     # Load or generate data
@@ -108,6 +112,7 @@ def train(data_path: str, output_dir: str, use_synthetic: bool = False):
         df = generate_synthetic_dataset()
         df.to_csv(data_path, index=False)
         print(f"   Saved synthetic dataset → {data_path}")
+        data_source = "synthetic"
     else:
         df = pd.read_csv(data_path)
         print(f"Loaded dataset: {len(df)} samples from {data_path}")
@@ -221,6 +226,16 @@ def train(data_path: str, output_dir: str, use_synthetic: bool = False):
     except Exception as e:
         print(f"  Plot skipped: {e}")
 
+    register_model(
+        version=settings.MODEL_VERSION,
+        form_mae=mae, form_r2=r2,
+        success_accuracy=acc, success_auc=auc,
+        n_train_samples=len(X_tr),
+        data_source=data_source,
+    )
+    if data_source != "real":
+        print(f"\n⚠  Models trained on '{data_source}' data — predictions are not validated against real shots")
+
     print(f"\n✅ All models saved to {output_dir}")
 
 
@@ -229,5 +244,7 @@ if __name__ == "__main__":
     parser.add_argument("--data",       default="data/processed/shots.csv")
     parser.add_argument("--output",     default="data/models/")
     parser.add_argument("--synthetic",  action="store_true", help="Force synthetic data generation")
+    parser.add_argument("--data-source", choices=["real", "synthetic", "unknown"], default="unknown",
+                        help="Provenance of --data CSV (ignored when synthetic data is generated)")
     args = parser.parse_args()
-    train(args.data, args.output, args.synthetic)
+    train(args.data, args.output, args.synthetic, args.data_source)

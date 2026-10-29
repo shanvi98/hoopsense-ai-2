@@ -7,9 +7,9 @@ import time
 import uuid
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 from app.core.config import settings
-from app.models.schemas import ShotPrediction, AnalysisStatus
+from app.models.schemas import ShotPrediction, AnalysisStatus, ShotPhase
 from app.services.video_processor import VideoProcessor
 from app.services.pose_estimator import PoseEstimator
 from app.services.object_detector import ObjectDetector
@@ -37,14 +37,34 @@ class AnalysisService:
     def get_session(self, session_id: str) -> Optional[dict]:
         return _sessions.get(session_id)
 
+    def missing_cv_components(self) -> List[str]:
+        """CV components required for real video analysis that failed to load."""
+        missing = []
+        if not self._pose_est.available: missing.append("mediapipe")
+        if not self._detector.available: missing.append("ultralytics (YOLO)")
+        return missing
+
+    def capabilities(self) -> dict:
+        return {
+            "pose_estimation": self._pose_est.available,
+            "object_detection": self._detector.available,
+            "video_analysis": not self.missing_cv_components(),
+            "ml_models_loaded": self._inference.models_loaded,
+            "training_data": self._inference.training_data,
+        }
+
     async def analyze_video(self, video_path: str, session_id: str) -> ShotPrediction:
         t_start = time.time()
         _sessions[session_id]["status"] = AnalysisStatus.PROCESSING
+        is_demo = video_path == "__demo__"
 
         try:
-            if video_path == "__demo__":
+            if is_demo:
                 pose_frames, detections, fps, height, n_frames, duration = self._generate_demo_data()
             else:
+                missing = self.missing_cv_components()
+                if missing:
+                    raise RuntimeError(f"Video analysis unavailable — missing: {', '.join(missing)}")
                 valid, msg = self._video_proc.validate_video(video_path)
                 if not valid:
                     raise ValueError(msg)
@@ -62,10 +82,13 @@ class AnalysisService:
                     det = self._detector.detect_frame(frame.bgr, frame.frame_idx, frame.timestamp_ms)
                     if pf: pose_frames.append(pf)
                     detections.append(det)
+                if not pose_frames:
+                    raise ValueError("No person detected in the video — make sure the shooter's full body is in frame")
 
             trajectory  = self._detector.build_trajectory(detections)
             features    = self._features.extract(pose_frames, detections, trajectory, fps, height)
-            form_score, make_prob, confidence = self._inference.predict(features)
+            form_score, make_prob, scoring_method = self._inference.predict(features)
+            confidence  = self._signal_quality(pose_frames, detections)
             form_grade  = InferenceEngine.score_to_grade(form_score)
             feedback    = self._inference.generate_feedback(features)
 
@@ -102,6 +125,9 @@ class AnalysisService:
                 form_grade=form_grade,
                 make_probability=make_prob,
                 confidence=confidence,
+                analysis_mode="demo" if is_demo else "video",
+                scoring_method=scoring_method,
+                training_data=self._inference.training_data,
                 features=features,
                 feedback=feedback,
                 ball_trajectory=ball_traj,
@@ -124,18 +150,31 @@ class AnalysisService:
             _sessions[session_id].update({"status": AnalysisStatus.FAILED, "error": str(e)})
             raise
         finally:
-            if video_path != "__demo__" and os.path.exists(video_path):
+            if not is_demo and os.path.exists(video_path):
                 try: os.remove(video_path)
-                except: pass
+                except OSError: pass
+
+    @staticmethod
+    def _signal_quality(pose_frames, detections) -> float:
+        """
+        How much the CV inputs can be trusted (0-1): share of frames with a pose,
+        mean landmark visibility, share of frames with a ball, hoop found, release found.
+        """
+        n = max(len(detections), 1)
+        pose_coverage = min(len(pose_frames) / n, 1.0)
+        pose_vis      = sum(pf.confidence for pf in pose_frames) / max(len(pose_frames), 1)
+        ball_coverage = sum(1 for d in detections if d.ball) / n
+        hoop_found    = 1.0 if any(d.hoop for d in detections) else 0.0
+        release_found = 1.0 if any(pf.shot_phase == ShotPhase.RELEASE for pf in pose_frames) else 0.0
+        score = (0.30 * pose_coverage + 0.20 * pose_vis + 0.30 * ball_coverage
+                 + 0.10 * hoop_found + 0.10 * release_found)
+        return round(min(max(score, 0.0), 1.0), 3)
 
     def _generate_demo_data(self):
         """Generate synthetic shot sequence for demo mode (90 frames at 30fps)."""
         pose_frames, detections = [], []
         for i in range(90):
-            pf  = self._pose_est.process_frame(None, i, i * 1000.0 / 30)
-            # For demo, use pose estimator's synthetic mode
-            if pf is None:
-                pf = self._pose_est._generate_synthetic_pose(i, i * 1000.0 / 30)
+            pf  = self._pose_est._generate_synthetic_pose(i, i * 1000.0 / 30)
             det = self._detector._generate_synthetic_detection(i, i * 1000.0 / 30, (720, 1280, 3))
             pose_frames.append(pf)
             detections.append(det)

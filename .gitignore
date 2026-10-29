@@ -12,6 +12,7 @@ backend/data/outputs/
 backend/data/raw/videos/
 backend/data/models/*.pkl
 backend/data/models/*.pt
+backend/*.pt
 backend/data/processed/
 
 # Node

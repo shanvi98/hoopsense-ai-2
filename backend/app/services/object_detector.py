@@ -52,12 +52,16 @@ class ObjectDetector:
             self._available = True
             logger.info("YOLOv8 initialized: %s", settings.YOLO_MODEL)
         except Exception as e:
-            logger.warning("YOLO unavailable: %s — using synthetic detections", e)
+            logger.warning("YOLO unavailable: %s — real video analysis disabled (demo mode only)", e)
+
+    @property
+    def available(self) -> bool:
+        return self._available and self._model is not None
 
     def detect_frame(self, bgr_frame: np.ndarray, frame_idx: int, timestamp_ms: float) -> DetectionResult:
-        if self._available and self._model:
-            return self._detect_with_yolo(bgr_frame, frame_idx, timestamp_ms)
-        return self._generate_synthetic_detection(frame_idx, timestamp_ms, bgr_frame.shape)
+        if not self.available:
+            raise RuntimeError("YOLO is not available — cannot run object detection on real video")
+        return self._detect_with_yolo(bgr_frame, frame_idx, timestamp_ms)
 
     def _detect_with_yolo(self, bgr: np.ndarray, idx: int, ts: float) -> DetectionResult:
         try:

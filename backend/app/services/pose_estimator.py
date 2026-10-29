@@ -43,7 +43,8 @@ SKELETON_CONNECTIONS = [
 class PoseEstimator:
     """
     MediaPipe-based full-body pose estimation.
-    Falls back to synthetic landmarks if MediaPipe unavailable (testing mode).
+    Raises if MediaPipe is unavailable; synthetic landmarks are only produced
+    explicitly via _generate_synthetic_pose (demo mode).
     """
 
     def __init__(self):
@@ -69,16 +70,19 @@ class PoseEstimator:
             self._available = True
             logger.info("MediaPipe Pose initialized (complexity=%d)", settings.MEDIAPIPE_MODEL_COMPLEXITY)
         except ImportError:
-            logger.warning("MediaPipe not available — using synthetic pose data")
+            logger.warning("MediaPipe not installed — real video analysis disabled (demo mode only)")
         except Exception as e:
-            logger.warning("MediaPipe init failed: %s — using synthetic pose data", e)
+            logger.warning("MediaPipe init failed: %s — real video analysis disabled (demo mode only)", e)
+
+    @property
+    def available(self) -> bool:
+        return self._available and self._pose_model is not None
 
     def process_frame(self, rgb_frame: np.ndarray, frame_idx: int, timestamp_ms: float) -> Optional[PoseFrame]:
         """Extract pose landmarks from a single RGB frame."""
-        if self._available and self._pose_model:
-            return self._process_with_mediapipe(rgb_frame, frame_idx, timestamp_ms)
-        else:
-            return self._generate_synthetic_pose(frame_idx, timestamp_ms)
+        if not self.available:
+            raise RuntimeError("MediaPipe is not available — cannot run pose estimation on real video")
+        return self._process_with_mediapipe(rgb_frame, frame_idx, timestamp_ms)
 
     def _process_with_mediapipe(self, rgb: np.ndarray, idx: int, ts: float) -> Optional[PoseFrame]:
         """Run MediaPipe inference on a single frame."""
