@@ -1,0 +1,4 @@
+# Install after core — CV libs (may need troubleshooting on older Macs)
+opencv-python-headless>=4.8.0
+mediapipe>=0.10.0
+ultralytics>=8.0.0

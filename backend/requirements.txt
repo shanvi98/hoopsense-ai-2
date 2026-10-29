@@ -1,0 +1,31 @@
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+
+# ML / Data Science (install these first)
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+scipy>=1.11.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Computer Vision (install separately if these fail — app works without them)
+# Run: pip install opencv-python-headless
+opencv-python-headless>=4.8.0
+
+# MediaPipe: install manually if this line fails:
+# pip install mediapipe  (no version pin — latest works)
+mediapipe>=0.10.0
+
+# YOLOv8 — install manually if this fails:
+# pip install ultralytics
+ultralytics>=8.0.0

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Data (don't commit videos or trained models)
+backend/data/uploads/
+backend/data/outputs/
+backend/data/raw/videos/
+backend/data/models/*.pkl
+backend/data/models/*.pt
+backend/data/processed/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
